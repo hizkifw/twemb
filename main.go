@@ -26,6 +26,10 @@ var (
 				},
 			},
 		},
+		{
+			Name: "Delete Message",
+			Type: discordgo.MessageApplicationCommand,
+		},
 	}
 	commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
 		"twemb": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -49,6 +53,40 @@ var (
 			})
 			if err != nil {
 				log.Println("Error responding to interaction: ", err)
+			}
+		},
+		"Delete Message": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			commandData := i.ApplicationCommandData()
+			message := commandData.Resolved.Messages[commandData.TargetID]
+			log.Printf("Member %s requested to delete message %s", i.Member.User.Username, message.ID)
+
+			if message.Author.Username == i.Member.User.Username {
+				if err := s.ChannelMessageDelete(message.ChannelID, message.ID); err != nil {
+					log.Println("Error deleting message: ", err)
+					s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+						Type: discordgo.InteractionResponseChannelMessageWithSource,
+						Data: &discordgo.InteractionResponseData{
+							Content: "Failed to delete message",
+							Flags:   discordgo.MessageFlagsEphemeral,
+						},
+					})
+				} else {
+					s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+						Type: discordgo.InteractionResponseChannelMessageWithSource,
+						Data: &discordgo.InteractionResponseData{
+							Content: "Message deleted",
+							Flags:   discordgo.MessageFlagsEphemeral,
+						},
+					})
+				}
+			} else {
+				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseChannelMessageWithSource,
+					Data: &discordgo.InteractionResponseData{
+						Content: "You can only delete your own messages",
+						Flags:   discordgo.MessageFlagsEphemeral,
+					},
+				})
 			}
 		},
 	}

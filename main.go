@@ -10,10 +10,35 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+type substitution struct {
+	regex        *regexp.Regexp
+	substitution string
+}
+
 var (
-	regexTwitter      = regexp.MustCompile(`(?m)https://(x\.com|twitter\.com)/([a-zA-Z0-9_]{4,15}/status)`)
-	regexSubstitution = "https://vxtwitter.com/$2"
-	commands          = []*discordgo.ApplicationCommand{
+	substitutions = []*substitution{
+		{
+			// Twitter
+			regex:        regexp.MustCompile(`(?m)https://(x\.com|twitter\.com)/([a-zA-Z0-9_]{4,15}/status)`),
+			substitution: "https://vxtwitter.com/$2",
+		},
+		{
+			// Reddit
+			regex:        regexp.MustCompile(`(?m)https://(www\.)?reddit\.com/(.*)`),
+			substitution: "https://rxddit.com/$2",
+		},
+		{
+			// Instagram
+			regex:        regexp.MustCompile(`(?m)https://(www\.)?instagram\.com/p/(.*)`),
+			substitution: "https://ddinstagram.com/p/$2",
+		},
+		{
+			// Bilibili
+			regex:        regexp.MustCompile(`(?m)https://(www\.)?bilibili\.com/video/([a-zA-Z0-9_]+)`),
+			substitution: "https://vxbilibili.com/video/$2",
+		},
+	}
+	commands = []*discordgo.ApplicationCommand{
 		{
 			Name:        "twemb",
 			Description: "Enable and disable Twitter link embedding",
@@ -93,7 +118,13 @@ var (
 )
 
 func substituteTwitterLinks(input string) string {
-	return regexTwitter.ReplaceAllString(input, regexSubstitution)
+	result := input
+	for _, sub := range substitutions {
+		if sub.regex != nil {
+			result = sub.regex.ReplaceAllString(result, sub.substitution)
+		}
+	}
+	return result
 }
 
 func main() {

@@ -30,7 +30,7 @@ var (
 		{
 			// Instagram
 			regex:        regexp.MustCompile(`(?m)https://(www\.)?instagram\.com/p/(.*)`),
-			substitution: "https://kkinstagram.com/p/$2",
+			substitution: "https://eeinstagram.com/p/$2",
 		},
 		{
 			// Bilibili

@@ -25,7 +25,7 @@ var (
 		{
 			// Reddit
 			regex:        regexp.MustCompile(`(?m)https://(www\.)?reddit\.com/(.*)`),
-			substitution: "https://rxddit.com/$2",
+			substitution: "https://vxreddit.com/$2",
 		},
 		{
 			// Instagram

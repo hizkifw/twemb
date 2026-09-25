@@ -143,7 +143,7 @@ func main() {
 	session.AddHandler(messageCreate)
 	session.AddHandler(interactionCreate)
 
-	session.Identify.Intents = discordgo.IntentsGuildMessages
+	session.Identify.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMessages
 
 	err = session.Open()
 	if err != nil {
@@ -189,23 +189,27 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	var webhook *discordgo.Webhook = nil
-	webhooks, err := s.ChannelWebhooks(m.ChannelID)
+	// Webhooks can't be created on threads, so use the parent channel's
+	// webhook and target the thread when executing it
+	webhookChannelID := m.ChannelID
+	threadID := ""
+	channel, err := s.State.Channel(m.ChannelID)
 	if err != nil {
-		log.Println("Error getting webhooks: ", err)
-		return
-	}
-
-	if len(webhooks) > 0 {
-		// Use any existing webhook
-		webhook = webhooks[0]
-	} else {
-		// Create a webhook for the channel
-		webhook, err = s.WebhookCreate(m.ChannelID, "Twitter Substitution", "")
+		channel, err = s.Channel(m.ChannelID)
 		if err != nil {
-			log.Println("Error creating webhook: ", err)
+			log.Println("Error getting channel: ", err)
 			return
 		}
+	}
+	if channel.IsThread() {
+		webhookChannelID = channel.ParentID
+		threadID = channel.ID
+	}
+
+	webhook, err := getWebhook(s, webhookChannelID)
+	if err != nil {
+		log.Println("Error getting webhook: ", err)
+		return
 	}
 
 	// Get author profile
@@ -216,7 +220,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	// Send the message
-	webhookMessage, err := s.WebhookExecute(webhook.ID, webhook.Token, true, &discordgo.WebhookParams{
+	webhookMessage, err := s.WebhookThreadExecute(webhook.ID, webhook.Token, true, threadID, &discordgo.WebhookParams{
 		Content:   fixed,
 		Username:  authorProfile.Username,
 		AvatarURL: authorProfile.AvatarURL(""),
@@ -234,4 +238,22 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		log.Println("Error deleting message: ", err)
 		return
 	}
+}
+
+func getWebhook(s *discordgo.Session, channelID string) (*discordgo.Webhook, error) {
+	webhooks, err := s.ChannelWebhooks(channelID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Use any existing webhook we can execute. Channel follower webhooks and
+	// webhooks owned by other applications don't expose a token.
+	for _, w := range webhooks {
+		if w.Type == discordgo.WebhookTypeIncoming && w.Token != "" {
+			return w, nil
+		}
+	}
+
+	// Create a webhook for the channel
+	return s.WebhookCreate(channelID, "Twitter Substitution", "")
 }

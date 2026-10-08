@@ -29,8 +29,8 @@ var (
 		},
 		{
 			// Instagram
-			regex:        regexp.MustCompile(`(?m)https://(www\.)?instagram\.com/(p|reels?)/(.*)`),
-			substitution: "https://eeinstagram.com/$2/$3",
+			regex:        regexp.MustCompile(`(?m)https://(www\.)?instagram\.com/(p|reels?)/([a-zA-Z0-9_-]+)[^\s?#]*(\?\S*)?(#\S*)?`),
+			substitution: "https://eeinstagram.com/$2/$3/",
 		},
 		{
 			// Bilibili

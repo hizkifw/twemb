@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Pulls, rebuilds and restarts twemb. Installed on the server as
+# /usr/local/sbin/twemb-deploy (root-owned) and run as root via sudo by the
+# twemb-deploy user, whose SSH key is pinned to this script.
+set -euo pipefail
+
+APP_USER=casualweeb23
+APP_DIR=/home/casualweeb23/twemb
+SERVICE=twemb.service
+GO=/usr/local/go/bin/go
+
+exec 9>/run/lock/twemb-deploy.lock
+flock -w 300 9
+
+as_app() {
+	/usr/sbin/runuser -u "$APP_USER" -- env -C "$APP_DIR" HOME="/home/$APP_USER" "$@"
+}
+
+as_app git pull --ff-only
+as_app "$GO" build -o twemb.new .
+
+# keep the running binary around so a bad build can be rolled back
+[ -f "$APP_DIR/twemb" ] && cp -p "$APP_DIR/twemb" "$APP_DIR/twemb.prev"
+mv "$APP_DIR/twemb.new" "$APP_DIR/twemb"
+
+systemctl restart "$SERVICE"
+sleep 5
+if ! systemctl is-active --quiet "$SERVICE"; then
+	echo "$SERVICE failed to start, rolling back" >&2
+	journalctl -u "$SERVICE" -n 30 --no-pager >&2 || true
+	if [ -f "$APP_DIR/twemb.prev" ]; then
+		cp -p "$APP_DIR/twemb.prev" "$APP_DIR/twemb"
+		systemctl restart "$SERVICE"
+	fi
+	exit 1
+fi
+
+echo "deployed $(as_app git rev-parse --short HEAD)"
